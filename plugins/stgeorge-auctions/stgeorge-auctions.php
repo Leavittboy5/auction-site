@@ -37,34 +37,6 @@ require_once plugin_dir_path( __FILE__ ) . 'auction-reports.php';
 // 8. Mass Upload Page
 require_once plugin_dir_path( __FILE__ ) . 'auction-mass-upload.php';
 
-// AJAX Action for Stripe Deposit
-add_action('wp_ajax_stg_process_deposit', 'stg_process_deposit_ajax');
-function stg_process_deposit_ajax() {
-    check_ajax_referer('stg_deposit_nonce', 'security');
-    if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized');
-
-    $post_id = intval($_POST['post_id']);
-    $type = sanitize_text_field($_POST['type']);
-    $intent_id = get_post_meta($post_id, '_stg_stripe_intent_id', true);
-
-    if (!$intent_id) wp_send_json_error('No Stripe Intent found for this auction.');
-
-    // Mock Stripe logic:
-    if ($type === 'release') {
-        // \Stripe\Stripe::setApiKey('sk_test_mock_key');
-        // $intent = \Stripe\PaymentIntent::retrieve($intent_id);
-        // $intent->cancel();
-        update_post_meta($post_id, '_stg_cleaning_deposit_held', 'released');
-        wp_send_json_success('Hold released successfully. The $100 will drop off the customer\'s statement.');
-    } elseif ($type === 'capture') {
-        // \Stripe\Stripe::setApiKey('sk_test_mock_key');
-        // $intent = \Stripe\PaymentIntent::retrieve($intent_id);
-        // $intent->capture(['amount_to_capture' => 10000]); // Capture $100
-        update_post_meta($post_id, '_stg_cleaning_deposit_held', 'captured');
-        wp_send_json_success('Hold captured. The $100 has been charged to the customer.');
-    }
-}
-
 // Enqueue Socket.io
 add_action('wp_enqueue_scripts', 'stg_enqueue_socket_io');
 function stg_enqueue_socket_io() {
@@ -171,30 +143,8 @@ function stg_process_ended_auctions_emails() {
                         $cleaning_deposit = 100.00;
                         $total       = $winning_bid + $fee + $deposit + $cleaning_deposit;
                         
-                        // Stripe Mock Implementation:
-                        // 1. Authorize total amount (capture_method: manual)
-                        // 2. Capture the 15% immediately
-                        $customer_id = get_user_meta($winner_id, 'stg_stripe_customer_id', true);
-                        if ($customer_id) {
-                            // In a real integration:
-                            // \Stripe\Stripe::setApiKey('sk_test_mock_key');
-                            // $intent = \Stripe\PaymentIntent::create([
-                            //     'amount' => $total * 100,
-                            //     'currency' => 'usd',
-                            //     'customer' => $customer_id,
-                            //     'payment_method' => get_user_meta($winner_id, 'stg_stripe_payment_method', true),
-                            //     'capture_method' => 'manual',
-                            //     'confirm' => true,
-                            //     'off_session' => true
-                            // ]);
-                            // $intent->capture(['amount_to_capture' => $fee * 100]);
-                            
-                            update_post_meta( $auction_id, '_stg_stripe_intent_id', 'pi_mock_intent_123' );
-                            update_post_meta( $auction_id, '_stg_cleaning_deposit_held', 'yes' );
-                        }
-
                         $subject = "You won! Storage Unit Auction";
-                        $message = "You won! A 15% buyer premium ($" . number_format($fee, 2) . ") has been charged to your card. A $100 cleaning deposit hold has also been placed. Remaining balance: $" . number_format($winning_bid + $deposit, 2) . " due in CASH at our main office (1156 E 700 S Ste. 1). You have 3 days to empty the unit.";
+                        $message = "You won! The final bid was $" . number_format($winning_bid, 2) . ". Including the 15% buyer premium, the $35 lock deposit, and the $100 refundable cleaning deposit, your total balance is $" . number_format($total, 2) . " due in CASH at our main office (1156 E 700 S Ste. 1). You have 3 days to empty the unit.";
                         
                         wp_mail( $winner_info->user_email, $subject, $message );
                     }

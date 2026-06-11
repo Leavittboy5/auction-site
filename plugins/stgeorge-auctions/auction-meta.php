@@ -63,49 +63,6 @@ function stg_auction_meta_box_html( $post ) {
         <label><strong>Item Description:</strong></label><br>
         <textarea name="stg_item_description" rows="3" style="width: 100%;"><?php echo esc_textarea($item_desc); ?></textarea>
     </div>
-    
-    <?php
-    $deposit_held = get_post_meta($post->ID, '_stg_cleaning_deposit_held', true);
-    if ($deposit_held === 'yes') :
-    ?>
-    <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; background: #fff;">
-        <label><strong>$100 Cleaning Deposit Hold</strong></label>
-        <p>A $100 hold was placed on the winner's card.</p>
-        <button type="button" class="button stg-deposit-action" data-action="release" data-id="<?php echo $post->ID; ?>" style="margin-right:10px;">Unit Clean (Release Hold)</button>
-        <button type="button" class="button button-primary stg-deposit-action" data-action="capture" data-id="<?php echo $post->ID; ?>">Abandoned (Capture Hold)</button>
-        <div id="stg-deposit-response" style="margin-top: 10px; font-weight: bold;"></div>
-        
-        <script>
-        jQuery(document).ready(function($) {
-            $('.stg-deposit-action').on('click', function(e) {
-                e.preventDefault();
-                var actionType = $(this).data('action');
-                var postId = $(this).data('id');
-                var btn = $(this);
-                
-                if (!confirm('Are you sure you want to ' + actionType + ' the $100 hold?')) return;
-                
-                btn.prop('disabled', true).text('Processing...');
-                
-                $.post(ajaxurl, {
-                    action: 'stg_process_deposit',
-                    type: actionType,
-                    post_id: postId,
-                    security: '<?php echo wp_create_nonce("stg_deposit_nonce"); ?>'
-                }, function(response) {
-                    if (response.success) {
-                        $('#stg-deposit-response').css('color', 'green').text(response.data);
-                        $('.stg-deposit-action').hide();
-                    } else {
-                        $('#stg-deposit-response').css('color', 'red').text(response.data);
-                        btn.prop('disabled', false).text(actionType === 'release' ? 'Unit Clean (Release Hold)' : 'Abandoned (Capture Hold)');
-                    }
-                });
-            });
-        });
-        </script>
-    </div>
-    <?php endif; ?>
     <?php
 }
 

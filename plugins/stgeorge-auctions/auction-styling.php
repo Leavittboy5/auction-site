@@ -32,8 +32,8 @@ function stg_custom_login_signup_styles() {
         }
 
         /* Make inputs look modern */
-        #login input[type="text"], #login input[type="password"], #login input[type="email"],
-        .mu_register input[type="text"], .mu_register input[type="email"], .mu_register input[type="password"] {
+        #login input[type="text"], #login input[type="password"], #login input[type="email"], #login input[type="tel"], #login input[type="number"],
+        .mu_register input[type="text"], .mu_register input[type="email"], .mu_register input[type="password"], .mu_register input[type="tel"], .mu_register input[type="number"] {
             width: 100% !important;
             padding: 14px !important;
             border: 1px solid #d1d5db !important;

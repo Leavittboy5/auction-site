@@ -4,9 +4,6 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-/**
- * Shortcode to display active auctions with Filter, Media, and Terms
- */
 function stg_display_auctions_shortcode($atts) {
     $a = shortcode_atts( array(
         'batch' => '',
@@ -16,14 +13,13 @@ function stg_display_auctions_shortcode($atts) {
 
     ob_start();
 
-    // Enqueue the JS and pass the security nonce and AJAX URL
-    wp_enqueue_script( 'stg-auction-js', plugin_dir_url(__FILE__) . 'auction-script.js', array('jquery'), '1.2', true );
+    wp_enqueue_script( 'stg-auction-js', plugin_dir_url(__FILE__) . 'auction-script.js', array('jquery'), '1.4', true );
     wp_localize_script( 'stg-auction-js', 'stgAuctionData', array(
         'ajaxurl' => admin_url( 'admin-ajax.php' ),
-        'nonce'   => wp_create_nonce( 'stg_bid_nonce' )
+        'nonce'   => wp_create_nonce( 'stg_bid_nonce' ),
+        'user_id' => get_current_user_id()
     ));
 
-    // Get all 'auction_batch' terms that are marked to be hidden
     $hidden_batch_terms = get_terms( array(
         'taxonomy'   => 'auction_batch',
         'hide_empty' => false,
@@ -60,7 +56,6 @@ function stg_display_auctions_shortcode($atts) {
 
     if ( ! empty( $a['id'] ) ) {
         $args['p'] = intval( $a['id'] );
-        // If displaying a single auction directly via shortcode ID, we can ignore the hide_from_list meta check so they can view it.
         unset( $args['meta_query'] ); 
     }
 
@@ -115,11 +110,15 @@ function stg_display_auctions_shortcode($atts) {
             $end_date         = get_post_meta( $auction_id, '_stg_end_date', true );
             $starting_bid     = floatval( get_post_meta( $auction_id, '_stg_starting_bid', true ) );
             $current_bid      = floatval( get_post_meta( $auction_id, '_stg_current_bid', true ) );
+            $current_max_bid  = floatval( get_post_meta( $auction_id, '_stg_max_bid', true ) );
+            $high_bidder_id   = get_post_meta( $auction_id, '_stg_high_bidder', true );
             $item_description = get_post_meta( $auction_id, '_stg_item_description', true );
             $video_url        = get_post_meta( $auction_id, '_stg_video_url', true );
             $unit_id          = get_post_meta( $auction_id, '_stg_unit_id', true );
+            $current_user_id  = get_current_user_id();
             
-            // Check if part of upcoming batch
+            $is_winning = ($current_user_id && $current_user_id == $high_bidder_id);
+
             $is_upcoming = false;
             $terms = wp_get_post_terms( $auction_id, 'auction_batch' );
             if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
@@ -131,19 +130,22 @@ function stg_display_auctions_shortcode($atts) {
                 }
             }
 
-            // Title masking logic
             $display_title = "Unit #" . esc_html( $unit_id );
             if ( $is_upcoming || empty($unit_id) ) {
                 $display_title = "Upcoming Unit";
             }
 
-            // Calculate display price and the next minimum required bid
             $display_price = $current_bid > 0 ? $current_bid : $starting_bid;
-            $next_min_bid  = $current_bid > 0 ? ($current_bid + 1.00) : $starting_bid;
+            
+            if ( $is_winning ) {
+                $next_min_bid = $current_max_bid + 1.00;
+            } else {
+                $next_min_bid = $current_bid > 0 ? ($current_bid + 1.00) : $starting_bid;
+            }
 
             $end_timestamp = !empty($end_date) ? strtotime($end_date) : 0;
             ?>
-            <div class="facility-card p-6 border rounded-xl flex flex-col gap-6 bg-white shadow-sm transition-all duration-300" data-facility="<?php echo esc_attr($facility); ?>" data-end-timestamp="<?php echo esc_attr($end_timestamp); ?>">
+            <div class="facility-card p-6 border rounded-xl flex flex-col gap-6 bg-white shadow-sm transition-all duration-300" data-facility="<?php echo esc_attr($facility); ?>" data-end-timestamp="<?php echo esc_attr($end_timestamp); ?>" data-auction-id="<?php echo $auction_id; ?>">
                 <div class="w-full bg-gray-200 h-48 rounded-lg overflow-hidden flex items-center justify-center relative">
                     <?php if ( has_post_thumbnail() ) : ?>
                         <?php the_post_thumbnail('medium', ['class' => 'w-full h-full object-cover']); ?>
@@ -215,6 +217,12 @@ function stg_display_auctions_shortcode($atts) {
                         <div>
                             <span class="text-xs text-gray-500 uppercase font-bold tracking-wider">Current Bid</span>
                             <span class="text-3xl font-black text-gray-800 stg-current-bid-display block">$<?php echo number_format($display_price, 2); ?></span>
+                            
+                            <div class="stg-winning-badge-container mt-1">
+                                <?php if ( $is_winning ) : ?>
+                                    <span class="text-xs font-bold text-green-600 stg-winning-badge block"><i class="fa-solid fa-crown"></i> Winning! (Your Max: $<?php echo number_format($current_max_bid, 2); ?>)</span>
+                                <?php endif; ?>
+                            </div>
 
                             <?php
                             $management_fee = $display_price * 0.15;
