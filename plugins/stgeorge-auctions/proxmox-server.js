@@ -1,3 +1,28 @@
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "*", methods: ["GET", "POST"] }
+});
+
+const auctionStates = {};
+
+io.on('connection', (socket) => {
+    socket.on('joinAuction', (auctionId) => {
+        socket.join(auctionId);
+        if (auctionStates[auctionId]) {
+            socket.emit('updateAuction', auctionStates[auctionId]);
+        }
+    });
+});
+
 app.post('/api/new-bid', (req, res) => {
     const data = req.body;
     const auctionId = data.auctionId;
@@ -20,9 +45,23 @@ app.post('/api/new-bid', (req, res) => {
         nextMinBid: nextMinBid.toFixed(2),
         highBidderId: data.highBidderId,
         previousHighBidderId: data.previousHighBidderId,
-        newEndTimestamp: data.newEndTimestamp // Ensure this is saved and broadcasted
+        newEndTimestamp: data.newEndTimestamp,
+        maxBid: data.maxBid ? parseFloat(data.maxBid).toFixed(2) : '0.00'
     };
 
     io.to(auctionId).emit('updateAuction', auctionStates[auctionId]);
     res.json({ success: true, state: auctionStates[auctionId] });
+});
+
+app.get('/api/auction-state/:id', (req, res) => {
+    const auctionId = req.params.id;
+    if (auctionStates[auctionId]) {
+        res.json({ success: true, state: auctionStates[auctionId] });
+    } else {
+        res.json({ success: false, error: 'Not found in memory' });
+    }
+});
+
+server.listen(8080, '0.0.0.0', () => {
+    console.log('Proxmox Socket Server running on port 8080');
 });
