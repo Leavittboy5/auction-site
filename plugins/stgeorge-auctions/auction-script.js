@@ -66,10 +66,13 @@
                             var isReallyWinning = (String(currentUserId) === String(item.highBidderId));
                             
                             if (isReallyWinning) {
-                                var maxStr = (item.maxBid && parseFloat(item.maxBid) > 0) ? ' (Your Max: $' + parseFloat(item.maxBid).toFixed(2) + ')' : '';
+                                var myMaxBid = parseFloat(card.attr('data-my-max-bid')) || 0;
+                                var maxStr = (myMaxBid > 0) ? ' (Your Max: $' + myMaxBid.toFixed(2) + ')' : '';
                                 badgeContainer.html('<span class="text-xs font-bold text-green-600 stg-winning-badge block"><i class="fa-solid fa-crown"></i> Winning!' + maxStr + '</span>');
                             } else {
-                                badgeContainer.html('<span class="text-xs font-bold text-red-600 stg-outbid-badge block"><i class="fa-solid fa-triangle-exclamation"></i> Outbid!</span>');
+                                if (badgeContainer.find('.stg-winning-badge').length > 0 || badgeContainer.find('.stg-outbid-badge').length > 0) {
+                                    badgeContainer.html('<span class="text-xs font-bold text-red-600 stg-outbid-badge block"><i class="fa-solid fa-triangle-exclamation"></i> Outbid!</span>');
+                                }
                             }
                         }
 
@@ -170,6 +173,9 @@
                     card.find('.stg-bid-input').val('');
 
                     if (response.success) {
+                        if (response.data && response.data.max_bid) {
+                            card.attr('data-my-max-bid', response.data.max_bid);
+                        }
                         messageBox.removeClass('text-red-600 text-blue-600').addClass('text-green-600').text('Bid successful!');
                         setTimeout(function() { messageBox.fadeOut(); }, 3000);
                     } else {
@@ -181,6 +187,9 @@
                                 errorMsg = response.data.message;
                             }
                         }
+                        if (errorMsg.toLowerCase().includes('outbid')) {
+                            card.find('.stg-winning-badge-container').html('<span class="text-xs font-bold text-red-600 stg-outbid-badge block"><i class="fa-solid fa-triangle-exclamation"></i> Outbid!</span>');
+                        }
                         messageBox.removeClass('text-green-600 text-blue-600').addClass('text-red-600').text(errorMsg).show();
                     }
                 },
@@ -190,6 +199,9 @@
                     if (jqXHR.responseJSON && jqXHR.responseJSON.data) {
                         var errData = jqXHR.responseJSON.data;
                         var errorMsg = (typeof errData === 'string') ? errData : errData.message;
+                        if (errorMsg.toLowerCase().includes('outbid')) {
+                            card.find('.stg-winning-badge-container').html('<span class="text-xs font-bold text-red-600 stg-outbid-badge block"><i class="fa-solid fa-triangle-exclamation"></i> Outbid!</span>');
+                        }
                         messageBox.removeClass('text-green-600 text-blue-600').addClass('text-red-600').text(errorMsg).show();
                         card.find('.stg-bid-input').val('');
                     } else {

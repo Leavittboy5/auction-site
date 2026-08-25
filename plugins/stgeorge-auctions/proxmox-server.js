@@ -45,8 +45,7 @@ app.post('/api/new-bid', (req, res) => {
         nextMinBid: nextMinBid.toFixed(2),
         highBidderId: data.highBidderId,
         previousHighBidderId: data.previousHighBidderId,
-        newEndTimestamp: data.newEndTimestamp,
-        maxBid: data.maxBid ? parseFloat(data.maxBid).toFixed(2) : '0.00'
+        newEndTimestamp: data.newEndTimestamp
     };
 
     io.to(auctionId).emit('updateAuction', auctionStates[auctionId]);

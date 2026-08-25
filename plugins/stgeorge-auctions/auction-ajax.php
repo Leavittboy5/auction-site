@@ -67,6 +67,8 @@ function stg_process_bid() {
                 $current_bid = $new_max_bid;
                 update_post_meta( $auction_id, '_stg_current_bid', $current_bid );
                 $new_high_bidder_id = $high_bidder_id;
+                $is_outbid_immediately = true;
+                $outbid_message = 'You were immediately outbid by an existing proxy bid. The current bid is now $' . number_format($current_bid, 2);
             } else {
                 if ( $new_max_bid > $current_max_bid ) {
                     $current_bid = $current_max_bid + $increment;
@@ -78,6 +80,17 @@ function stg_process_bid() {
                 update_post_meta( $auction_id, '_stg_current_bid', $current_bid );
                 $new_high_bidder_id = $user_id;
             }
+        }
+    }
+
+    if ( ! empty($previous_high_bidder_id) && $previous_high_bidder_id != $new_high_bidder_id ) {
+        $prev_user = get_userdata( $previous_high_bidder_id );
+        if ( $prev_user ) {
+            $unit_id = get_post_meta( $auction_id, '_stg_unit_id', true );
+            $unit_title = !empty($unit_id) ? "Unit #" . $unit_id : "Upcoming Unit";
+            $subject = "You have been outbid on " . $unit_title;
+            $message = "You have been outbid on " . $unit_title . ". The new current bid is $" . number_format($current_bid, 2) . ". Log in to place a higher bid.";
+            wp_mail( $prev_user->user_email, $subject, $message );
         }
     }
 
@@ -100,8 +113,7 @@ function stg_process_bid() {
         'bidAmount'            => $current_bid, 
         'highBidderId'         => $new_high_bidder_id,
         'previousHighBidderId' => $previous_high_bidder_id,
-        'newEndTimestamp'      => $new_end_timestamp,
-        'maxBid'               => floatval( get_post_meta( $auction_id, '_stg_max_bid', true ) )
+        'newEndTimestamp'      => $new_end_timestamp
     );
 
     wp_remote_post( 'http://127.0.0.1:8080/api/new-bid', array(
@@ -117,7 +129,10 @@ function stg_process_bid() {
     if ( $is_outbid_immediately ) {
         wp_send_json_error( array( 'message' => $outbid_message ) );
     } else {
-        wp_send_json_success( array( 'message' => 'Bid placed successfully' ) );
+        wp_send_json_success( array(
+            'message' => 'Bid placed successfully',
+            'max_bid' => floatval( get_post_meta( $auction_id, '_stg_max_bid', true ) )
+        ) );
     }
 }
 add_action( 'wp_ajax_stg_place_bid', 'stg_process_bid' );
