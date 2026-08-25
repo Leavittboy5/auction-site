@@ -1,14 +1,17 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) {
-    exit; // Exit if accessed directly
+    exit;
 }
 
 function stg_process_bid() {
+    header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+    header("Pragma: no-cache");
+
     if ( ! is_user_logged_in() ) {
         wp_send_json_error( 'You must be logged in to place a bid.' );
     }
 
-    check_ajax_referer( 'stg_bid_nonce', 'security' );
+    check_ajax_referer( 'stg_bid_nonce', 'nonce' );
 
     $auction_id  = isset( $_POST['auction_id'] ) ? intval( $_POST['auction_id'] ) : 0;
     $new_max_bid = isset( $_POST['bid_amount'] ) ? floatval( $_POST['bid_amount'] ) : 0;
@@ -23,14 +26,14 @@ function stg_process_bid() {
     $current_max_bid = floatval( get_post_meta( $auction_id, '_stg_max_bid', true ) );
     $high_bidder_id  = get_post_meta( $auction_id, '_stg_high_bidder', true );
     
+    $previous_high_bidder_id = $high_bidder_id;
+
     if ( $current_bid == 0 ) {
         $current_bid = $starting_bid;
     }
 
     $increment = 1.00;
     
-    // If the user is the high bidder, they must beat their own max bid. 
-    // Otherwise, they must beat the public bid.
     if ( $user_id == $high_bidder_id ) {
         $min_required_bid = $current_max_bid + $increment;
     } else {
@@ -45,30 +48,31 @@ function stg_process_bid() {
     $outbid_message = '';
     $new_high_bidder_id = $high_bidder_id; 
 
-    // PROXY BIDDING ENGINE
     if ( empty($high_bidder_id) ) {
-        // First bid
         $current_bid = $starting_bid; 
         update_post_meta( $auction_id, '_stg_max_bid', $new_max_bid );
         update_post_meta( $auction_id, '_stg_high_bidder', $user_id );
         update_post_meta( $auction_id, '_stg_current_bid', $current_bid );
         $new_high_bidder_id = $user_id;
-        
     } else {
         if ( $user_id == $high_bidder_id ) {
-            // User increasing their own proxy bid
             update_post_meta( $auction_id, '_stg_max_bid', $new_max_bid );
         } else {
-            // New bidder vs existing proxy bid
-            if ( $new_max_bid <= $current_max_bid ) {
-                // Outbid immediately
+            if ( $new_max_bid < $current_max_bid ) {
                 $current_bid = min($new_max_bid + $increment, $current_max_bid);
                 update_post_meta( $auction_id, '_stg_current_bid', $current_bid );
                 $is_outbid_immediately = true;
                 $outbid_message = 'You were immediately outbid by an existing proxy bid. The current bid is now $' . number_format($current_bid, 2);
+            } elseif ( $new_max_bid == $current_max_bid ) {
+                $current_bid = $new_max_bid;
+                update_post_meta( $auction_id, '_stg_current_bid', $current_bid );
+                $new_high_bidder_id = $high_bidder_id;
             } else {
-                // New winner
-                $current_bid = $current_max_bid + $increment;
+                if ( $new_max_bid > $current_max_bid ) {
+                    $current_bid = $current_max_bid + $increment;
+                } else {
+                    $current_bid = $new_max_bid;
+                }
                 update_post_meta( $auction_id, '_stg_max_bid', $new_max_bid );
                 update_post_meta( $auction_id, '_stg_high_bidder', $user_id );
                 update_post_meta( $auction_id, '_stg_current_bid', $current_bid );
@@ -77,41 +81,32 @@ function stg_process_bid() {
         }
     }
 
-    $history = get_post_meta( $auction_id, '_stg_bid_history', true );
-    if ( !is_array($history) ) $history = array();
-    $history[] = array(
-        'user_id' => $user_id,
-        'amount'  => $new_max_bid, 
-        'time'    => current_time('mysql')
-    );
-    update_post_meta( $auction_id, '_stg_bid_history', $history );
-
-    $end_timestamp = intval( get_post_meta( $auction_id, '_stg_end_date', true ) );
+    // --- 15-SECOND ANTI-SNIPING EXTENSION RULE ---
+    $end_date_meta = get_post_meta( $auction_id, '_stg_end_date', true );
+    $end_timestamp = !empty($end_date_meta) ? strtotime($end_date_meta . ' ' . wp_timezone_string()) : 0;
     $current_time  = current_time( 'timestamp' );
     $time_left     = $end_timestamp - $current_time;
-    $new_end_timestamp = null;
+    $new_end_timestamp = $end_timestamp;
 
-    if ( $time_left > 0 && $time_left < 120 ) {
-        $new_end_timestamp = $end_timestamp + 120;
-        update_post_meta( $auction_id, '_stg_end_date', $new_end_timestamp );
+    if ( $time_left > 0 && $time_left <= 15 ) {
+        $new_end_timestamp = $current_time + 15;
+        update_post_meta( $auction_id, '_stg_end_date', date('Y-m-d H:i:s', $new_end_timestamp) );
     }
 
     clean_post_cache( $auction_id );
-    if ( class_exists( 'LiteSpeed_Cache_API' ) ) {
-        LiteSpeed_Cache_API::purge_post( $auction_id );
-    }
 
-    // Broadcast to WebSockets with the Winner's ID
     $push_data = array(
-        'auctionId'       => $auction_id,
-        'bidAmount'       => $current_bid, 
-        'highBidderId'    => $new_high_bidder_id,
-        'newEndTimestamp' => $new_end_timestamp
+        'auctionId'            => $auction_id,
+        'bidAmount'            => $current_bid, 
+        'highBidderId'         => $new_high_bidder_id,
+        'previousHighBidderId' => $previous_high_bidder_id,
+        'newEndTimestamp'      => $new_end_timestamp,
+        'maxBid'               => floatval( get_post_meta( $auction_id, '_stg_max_bid', true ) )
     );
 
-    wp_remote_post( 'http://127.0.0.1:3000/api/new-bid', array(
+    wp_remote_post( 'http://127.0.0.1:8080/api/new-bid', array(
         'method'      => 'POST',
-        'timeout'     => 1,
+        'timeout'     => 1, 
         'redirection' => 1,
         'httpversion' => '1.0',
         'blocking'    => false, 
@@ -120,20 +115,9 @@ function stg_process_bid() {
     ));
 
     if ( $is_outbid_immediately ) {
-        wp_send_json_error( array( 
-            'message' => $outbid_message,
-            'next_min_bid' => $current_bid + $increment
-        ) );
+        wp_send_json_error( array( 'message' => $outbid_message ) );
     } else {
-        $response_data = array(
-            'next_min_bid' => ($user_id == $new_high_bidder_id) ? $new_max_bid + $increment : $current_bid + $increment,
-            'is_winning'   => true,
-            'max_bid'      => $new_max_bid
-        );
-        if ( $new_end_timestamp ) {
-            $response_data['new_end_timestamp'] = $new_end_timestamp;
-        }
-        wp_send_json_success( $response_data );
+        wp_send_json_success( array( 'message' => 'Bid placed successfully' ) );
     }
 }
 add_action( 'wp_ajax_stg_place_bid', 'stg_process_bid' );
