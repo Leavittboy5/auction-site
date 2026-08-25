@@ -145,7 +145,7 @@ function stg_display_auctions_shortcode($atts) {
 
             $end_timestamp = !empty($end_date) ? strtotime($end_date) : 0;
             ?>
-            <div class="facility-card p-6 border rounded-xl flex flex-col gap-6 bg-white shadow-sm transition-all duration-300" data-facility="<?php echo esc_attr($facility); ?>" data-end-timestamp="<?php echo esc_attr($end_timestamp); ?>" data-auction-id="<?php echo $auction_id; ?>">
+            <div class="facility-card p-6 border rounded-xl flex flex-col gap-6 bg-white shadow-sm transition-all duration-300" data-facility="<?php echo esc_attr($facility); ?>" data-end-timestamp="<?php echo esc_attr($end_timestamp); ?>" data-auction-id="<?php echo $auction_id; ?>" data-my-max-bid="<?php echo $is_winning ? esc_attr($current_max_bid) : '0'; ?>">
                 <div class="w-full bg-gray-200 h-48 rounded-lg overflow-hidden flex items-center justify-center relative">
                     <?php if ( has_post_thumbnail() ) : ?>
                         <?php the_post_thumbnail('medium', ['class' => 'w-full h-full object-cover']); ?>
