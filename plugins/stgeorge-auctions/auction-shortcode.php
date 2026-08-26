@@ -143,7 +143,7 @@ function stg_display_auctions_shortcode($atts) {
                 $next_min_bid = $current_bid > 0 ? ($current_bid + 1.00) : $starting_bid;
             }
 
-            $end_timestamp = !empty($end_date) ? strtotime($end_date) : 0;
+            $end_timestamp = !empty($end_date) ? strtotime($end_date . ' ' . wp_timezone_string()) : 0;
             ?>
             <div class="facility-card p-6 border rounded-xl flex flex-col gap-6 bg-white shadow-sm transition-all duration-300" data-facility="<?php echo esc_attr($facility); ?>" data-end-timestamp="<?php echo esc_attr($end_timestamp); ?>" data-auction-id="<?php echo $auction_id; ?>" data-my-max-bid="<?php echo $is_winning ? esc_attr($current_max_bid) : '0'; ?>">
                 <div class="w-full bg-gray-200 h-48 rounded-lg overflow-hidden flex items-center justify-center relative">
@@ -176,7 +176,7 @@ function stg_display_auctions_shortcode($atts) {
                             <h4 class="text-xl font-bold mt-2 hover:text-amber-600 transition-colors">
                                 <a href="<?php the_permalink(); ?>"><?php echo esc_html( $display_title ); ?></a>
                             </h4>
-                            <p class="text-sm text-gray-500 mt-1">Ends: <strong><?php echo !empty($end_date) ? date('F j, Y @ g:i A', strtotime($end_date)) : 'TBD'; ?></strong></p>
+                            <p class="text-sm text-gray-500 mt-1">Ends: <strong><?php echo !empty($end_date) ? wp_date('F j, Y @ g:i A', $end_timestamp) : 'TBD'; ?></strong></p>
                             <?php if ( !empty($end_date) ) : ?>
                                 <p class="text-xs font-bold mt-1 text-red-600 uppercase tracking-wide stg-countdown-display" data-end-time="<?php echo esc_attr($end_timestamp); ?>">Time Remaining: <span class="stg-timer-text">Loading...</span></p>
                             <?php endif; ?>
@@ -237,7 +237,7 @@ function stg_display_auctions_shortcode($atts) {
                         </div>
 
                         <?php
-                        $is_ended = (!empty($end_date) && current_time('timestamp') >= strtotime($end_date)) ? true : false;
+                        $is_ended = (!empty($end_date) && time() >= $end_timestamp) ? true : false;
 
                         if ( $is_ended ) : ?>
                             <div class="text-right">

@@ -97,13 +97,13 @@ function stg_process_bid() {
     // --- 15-SECOND ANTI-SNIPING EXTENSION RULE ---
     $end_date_meta = get_post_meta( $auction_id, '_stg_end_date', true );
     $end_timestamp = !empty($end_date_meta) ? strtotime($end_date_meta . ' ' . wp_timezone_string()) : 0;
-    $current_time  = current_time( 'timestamp' );
+    $current_time  = time();
     $time_left     = $end_timestamp - $current_time;
     $new_end_timestamp = $end_timestamp;
 
     if ( $time_left > 0 && $time_left <= 15 ) {
         $new_end_timestamp = $current_time + 15;
-        update_post_meta( $auction_id, '_stg_end_date', date('Y-m-d H:i:s', $new_end_timestamp) );
+        update_post_meta( $auction_id, '_stg_end_date', wp_date('Y-m-d H:i:s', $new_end_timestamp) );
     }
 
     clean_post_cache( $auction_id );
