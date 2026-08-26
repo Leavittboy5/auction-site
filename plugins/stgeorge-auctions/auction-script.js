@@ -186,6 +186,27 @@
                             } else if (response.data.message) {
                                 errorMsg = response.data.message;
                             }
+                            if (response.data.state) {
+                                var item = response.data.state;
+                                var currentBid = parseFloat(item.currentBid);
+                                var currentBidDisplay = card.find('.stg-current-bid-display');
+                                if (currentBidDisplay.length && !isNaN(currentBid)) {
+                                    currentBidDisplay.text('$' + currentBid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                                }
+
+                                var feeDisplay = card.find('.stg-fee-display');
+                                var totalDisplay = card.find('.stg-total-display');
+                                if (feeDisplay.length && totalDisplay.length) {
+                                    feeDisplay.text('$' + parseFloat(item.fee).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                                    totalDisplay.text('$' + parseFloat(item.totalDue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                                }
+
+                                var inputField = card.find('.stg-bid-input');
+                                if (inputField.length && !inputField.is(':focus')) {
+                                    inputField.attr('min', item.nextMinBid);
+                                    inputField.attr('placeholder', '$' + Math.floor(item.nextMinBid) + '+');
+                                }
+                            }
                         }
                         if (errorMsg.toLowerCase().includes('outbid')) {
                             card.find('.stg-winning-badge-container').html('<span class="text-xs font-bold text-red-600 stg-outbid-badge block"><i class="fa-solid fa-triangle-exclamation"></i> Outbid!</span>');

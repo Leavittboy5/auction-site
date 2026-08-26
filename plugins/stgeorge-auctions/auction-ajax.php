@@ -127,7 +127,16 @@ function stg_process_bid() {
     ));
 
     if ( $is_outbid_immediately ) {
-        wp_send_json_error( array( 'message' => $outbid_message ) );
+        wp_send_json_error( array(
+            'message' => $outbid_message,
+            'state'   => array(
+                'auctionId'  => $auction_id,
+                'currentBid' => $current_bid,
+                'fee'        => $current_bid * 0.15,
+                'totalDue'   => $current_bid + ($current_bid * 0.15) + 35.00,
+                'nextMinBid' => $current_bid + 1.00
+            )
+        ) );
     } else {
         wp_send_json_success( array(
             'message' => 'Bid placed successfully',
